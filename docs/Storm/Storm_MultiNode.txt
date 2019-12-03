@@ -1,0 +1,168 @@
+Storm1	192.168.23.138
+Storm2	192.168.23.139
+Storm3	192.168.23.140
+Storm4	192.168.23.141
+
+change /etc/hosts on all the above 4 images and add this in the 3rd line of the existing file. For this from the home directory type sudo nano /etc/hosts and then type the password and then it will enter the file and in the 3rd line paste this [ by right clicking the mouse [ after you have copied it ]  :-
+
+192.168.23.138  zk.cluster.com  zk1
+192.168.23.139  ni.cluster.com  ni1
+192.168.23.140  s1.cluster.com  sl1
+192.168.23.141  s2.cluster.com  sl2
+
+To save the changes type Ctrl+X + Y [ for confirmation ] and then press enter for saving the file name [ do not change anything ] and then you are done. To cross check
+cat /etc/hosts
+
+Then to test if everything is correct on the first machine - ping 192.168.23.139 [ 2nd system ] and then the 3rd and then the 4th.
+
+Confirm that JDK 1.8 is already installed by checking this path in the first image [ All the other images are copies of the first image ]
+
+notroot@ubuntu:~$ cd /usr/lib/jvm
+notroot@ubuntu:/usr/lib/jvm$ ls -l
+total 8
+lrwxrwxrwx 1 root root   20 Jul 24  2015 java-1.7.0-openjdk-amd64 -> java-7-openjdk-amd64
+lrwxrwxrwx 1 root root   20 May 17  2018 java-1.8.0-openjdk-amd64 -> java-8-openjdk-amd64
+drwxr-xr-x 7 root root 4096 Oct 17  2015 java-7-openjdk-amd64
+drwxr-xr-x 7 root root 4096 Jun 16  2018 java-8-openjdk-amd64
+
+We can also check like this :-
+
+notroot@ubuntu:~$ java -version
+openjdk version "1.8.0_171"
+OpenJDK Runtime Environment (build 1.8.0_171-8u171-b11-2~14.04-b11)
+OpenJDK 64-Bit Server VM (build 25.171-b11, mixed mode)
+notroot@ubuntu:~$
+
+Zookeeper --> Only in Storm1 System
+
+Download ZK in the software folder on Storm1 system.
+	
+1)	notroot@ubuntu:~/lab/software$ tar -xvf ../../downloads/zookeeper-3.4.6.tar.gz
+
+2)	Add the following to the .bashrc file and then execute the same with . .bashrc from the /home/notroot folder
+
+export ZK_HOME=/home/notroot/lab/software/zookeeper-3.4.6
+export PATH=$PATH:$ZK_HOME/bin
+
+notroot@ubuntu:~$ . .bashrc
+
+3)	Go to the /home/notroot/lab/software/zookeeper-3.4.6/conf folder and rename zoo_sample.cfg to zoo.cfg.
+
+Delete the complete contents and add the following content
+
+# The number of milliseconds of each tick
+tickTime=2000
+# The number of ticks that the initial
+# synchronization phase can take
+initLimit=10
+# The number of ticks that can pass between
+# sending a request and getting an acknowledgement
+syncLimit=5
+# the directory where the snapshot is stored.
+# do not use /tmp for storage, /tmp here is just
+# example sakes.
+dataDir=/tmp/zookeeper
+# the port at which the clients will connect
+clientPort=2181
+autopurge.purgeInterval=24
+autopurge.snapRetainCount=5
+
+4)	Start Zookeeper
+
+notroot@ubuntu:~$ zkServer.sh start
+JMX enabled by default
+Using config: /home/notroot/lab/software/zookeeper-3.4.6/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED
+
+5)	To check if the server is running fine, we should try this:
+
+notroot@ubuntu:~$ echo ruok | nc zk1 2181
+imok 
+
+notroot@ubuntu:~$ echo conf | nc zk1 2181
+clientPort=2181
+dataDir=/tmp/zookeeper/version-2
+dataLogDir=/tmp/zookeeper/version-2
+tickTime=2000
+maxClientCnxns=60
+minSessionTimeout=4000
+maxSessionTimeout=40000
+serverId=0
+
+6)	Check what process is running :-
+
+notroot@ubuntu:~$ jps
+1755 QuorumPeerMain
+1861 Jps
+
+Storm Setup in all the other 3 nodes --> Storm2, Storm3, Storm4
+
+1)	extract storm in the lab/software folder
+
+notroot@ubuntu:~/lab/software$ tar -xvf ../../downloads/apache-storm-1.0.1.tar.gz
+
+1.1) Ensure that you create a storm directory in the lab/data folder.
+
+2)	make the following changes in the storm.yaml file on all the 3 systems
+
+storm.zookeeper.servers:
+    - "zk1"
+ 
+nimbus.host: "ni1"
+nimbus.childopts: "-Xmx1024m -Djava.net.preferIPv4Stack=true"
+ 
+ui.childopts: "-Xmx768m -Djava.net.preferIPv4Stack=true"
+ 
+supervisor.childopts: "-Djava.net.preferIPv4Stack=true"
+worker.childopts: "-Xmx768m -Djava.net.preferIPv4Stack=true"
+ 
+storm.local.dir: "/home/notroot/lab/data/storm"
+
+3)	Ensure that on all the 3 systems make change the following change in the .bashrc file and then ensure that you run the bashrc file like this: . .bashrc
+
+export STORM_HOME=/home/notroot/lab/software/apache-storm-1.0.1
+export PATH=$PATH:$STORM_HOME/bin
+
+notroot@ubuntu:~$ . .bashrc
+
+4)	We will now start the nimbus node and UI node on Storm2 system
+
+notroot@ubuntu:~$ storm nimbus &
+[1] 1774
+notroot@ubuntu:~$ Running: /usr/lib/jvm/java-1.8.0-openjdk-amd64/bin/java -server -Ddaemon.name=nimbus -Dstorm.options= -Dstorm.home=/home/notroot/lab/software/apache-storm-1.0.1 -Dstorm.log.dir=/home/notroot/lab/software/apache-storm-1.0.1/logs -Djava.library.path=/usr/local/lib:/opt/local/lib:/usr/lib -Dstorm.conf.file= -cp /home/notroot/lab/software/apache-storm-1.0.1/lib/asm-5.0.3.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/disruptor-3.3.2.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/reflectasm-1.10.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-over-slf4j-1.6.6.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/storm-core-1.0.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/clojure-1.7.0.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-slf4j-impl-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/objenesis-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/storm-rename-hack-1.0.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/servlet-api-2.5.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/kryo-3.0.3.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/slf4j-api-1.7.7.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-api-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/minlog-1.3.0.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-core-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/conf -Xmx1024m -Djava.net.preferIPv4Stack=true -Dlogfile.name=nimbus.log -DLog4jContextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector -Dlog4j.configurationFile=/home/notroot/lab/software/apache-storm-1.0.1/log4j2/cluster.xml org.apache.storm.daemon.nimbus
+
+
+notroot@ubuntu:~$ storm ui &
+[2] 1875
+notroot@ubuntu:~$ Running: /usr/lib/jvm/java-1.8.0-openjdk-amd64/bin/java -server -Ddaemon.name=ui -Dstorm.options= -Dstorm.home=/home/notroot/lab/software/apache-storm-1.0.1 -Dstorm.log.dir=/home/notroot/lab/software/apache-storm-1.0.1/logs -Djava.library.path=/usr/local/lib:/opt/local/lib:/usr/lib -Dstorm.conf.file= -cp /home/notroot/lab/software/apache-storm-1.0.1/lib/asm-5.0.3.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/disruptor-3.3.2.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/reflectasm-1.10.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-over-slf4j-1.6.6.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/storm-core-1.0.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/clojure-1.7.0.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-slf4j-impl-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/objenesis-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/storm-rename-hack-1.0.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/servlet-api-2.5.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/kryo-3.0.3.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/slf4j-api-1.7.7.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-api-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/minlog-1.3.0.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-core-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1:/home/notroot/lab/software/apache-storm-1.0.1/conf -Xmx768m -Djava.net.preferIPv4Stack=true -Dlogfile.name=ui.log -DLog4jContextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector -Dlog4j.configurationFile=/home/notroot/lab/software/apache-storm-1.0.1/log4j2/cluster.xml org.apache.storm.ui.core
+
+notroot@ubuntu:~$ jps
+1955 Jps
+1875 core
+1774 nimbus
+
+4)	We will be running the supervisor command on both Storm3 and Storm4 systems.
+
+notroot@ubuntu:~$ storm supervisor &
+[1] 1744
+notroot@ubuntu:~$ Running: /usr/lib/jvm/java-1.8.0-openjdk-amd64/bin/java -server -Ddaemon.name=supervisor -Dstorm.options= -Dstorm.home=/home/notroot/lab/software/apache-storm-1.0.1 -Dstorm.log.dir=/home/notroot/lab/software/apache-storm-1.0.1/logs -Djava.library.path=/usr/local/lib:/opt/local/lib:/usr/lib -Dstorm.conf.file= -cp /home/notroot/lab/software/apache-storm-1.0.1/lib/asm-5.0.3.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/disruptor-3.3.2.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/reflectasm-1.10.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-over-slf4j-1.6.6.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/storm-core-1.0.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/clojure-1.7.0.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-slf4j-impl-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/objenesis-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/storm-rename-hack-1.0.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/servlet-api-2.5.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/kryo-3.0.3.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/slf4j-api-1.7.7.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-api-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/minlog-1.3.0.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-core-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/conf -Djava.net.preferIPv4Stack=true -Dlogfile.name=supervisor.log -DLog4jContextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector -Dlog4j.configurationFile=/home/notroot/lab/software/apache-storm-1.0.1/log4j2/cluster.xml org.apache.storm.daemon.supervisor
+
+notroot@ubuntu:~$ storm supervisor &
+[1] 1762
+notroot@ubuntu:~$ Running: /usr/lib/jvm/java-1.8.0-openjdk-amd64/bin/java -server -Ddaemon.name=supervisor -Dstorm.options= -Dstorm.home=/home/notroot/lab/software/apache-storm-1.0.1 -Dstorm.log.dir=/home/notroot/lab/software/apache-storm-1.0.1/logs -Djava.library.path=/usr/local/lib:/opt/local/lib:/usr/lib -Dstorm.conf.file= -cp /home/notroot/lab/software/apache-storm-1.0.1/lib/asm-5.0.3.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/disruptor-3.3.2.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/reflectasm-1.10.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-over-slf4j-1.6.6.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/storm-core-1.0.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/clojure-1.7.0.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-slf4j-impl-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/objenesis-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/storm-rename-hack-1.0.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/servlet-api-2.5.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/kryo-3.0.3.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/slf4j-api-1.7.7.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-api-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/minlog-1.3.0.jar:/home/notroot/lab/software/apache-storm-1.0.1/lib/log4j-core-2.1.jar:/home/notroot/lab/software/apache-storm-1.0.1/conf -Djava.net.preferIPv4Stack=true -Dlogfile.name=supervisor.log -DLog4jContextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector -Dlog4j.configurationFile=/home/notroot/lab/software/apache-storm-1.0.1/log4j2/cluster.xml org.apache.storm.daemon.supervisor
+
+notroot@ubuntu:~$ jps
+1744 supervisor
+1840 Jps
+
+notroot@ubuntu:~$ jps
+1762 supervisor
+1848 Jps
+
+Udacity has this wonderful course on Apache Storm in collaboration with Twitter: Real-time Analytics with Apache Storm – 
+https://www.udacity.com/course/real-time-analytics-with-apache-storm--ud381
+
+You can check the Storm UI on
+
+http://ni1:8080/
+
